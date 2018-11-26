@@ -1,0 +1,21 @@
+{
+  "name": "bg",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "async": "^2.6.1",
+    "cheerio": "^1.0.0-rc.2",
+    "fs-extra": "^7.0.1",
+    "request": "^2.88.0",
+    "request-promise": "^4.2.2",
+    "socks5-http-client": "^1.0.4",
+    "superagent": "^4.0.0",
+    "xlsx": "^0.14.1"
+  }
+}

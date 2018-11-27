@@ -4,3 +4,4 @@ config.json
 data/
 node_modules
 back.js
+*.txt

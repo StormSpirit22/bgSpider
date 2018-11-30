@@ -35,12 +35,13 @@ const type = {
 
 let usersPosts = new Map();
 let postsForums = new Map();
+let postsTitles = new Map();
 
 
 async function writeFile() {
 
     let _headers = ['name', 'username', 'articles', 'questions', 'replys', 'rewards'];
-    let _headers2= ['name', 'link', 'forum'];
+    let _headers2= ['name', 'link', 'title', 'forum'];
     let _data = [];
     let _posts = [];
     for (var [key, value] of usersPosts) {
@@ -58,6 +59,7 @@ async function writeFile() {
             let post = {}
             post.name = value.name;
             post.link = p.link;
+            post.title = p.title;
             post.forum = p.forum;
             _posts.push(post)
         }
@@ -160,8 +162,10 @@ function getForum(url) {
             // console.log("index1index2", index1, index2)
             let forum = title.substr(index1 + 3, index2 - index1 - 3);
             fs.appendFileSync('./data/forum.txt', url + "|" +forum + "\n");
+            let filename = url.substr(url.length - 4, url.length);
             if(forum === "ETH" || forum === "EOS" || forum === "BTC" || forum === "HPB" || forum === "DAG" || forum === "IPFS" || forum === "Other") {
-                postsForums.set(url.substr(url.length - 4, url.length), forum);
+                postsForums.set(filename, forum);
+                postsTitles.set(filename, title);
             }
             resolve(forum);
         })
@@ -228,6 +232,7 @@ function calculatePosts(posts, filename) {
             author.posts = [];                            //初始化帖子详情
             post.created_at = value.created_at;         //创建时间
             post.forum = postsForums.get(filename);
+            post.title = postsTitles.get(filename);
             if(i == 0) {
                 // post.cooked = posts[i].cooked;                 //帖子内容
                 post.link = url + filename;

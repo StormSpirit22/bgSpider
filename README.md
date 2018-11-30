@@ -8,7 +8,7 @@ A spider for http://blockgeek.org.
 The simple steps to get & run bgSpider are:
 
 ```
-https://github.com/StormSpirit22/bgSpider
+git clone https://github.com/StormSpirit22/bgSpider
 cd bgSpider
 npm i
 npm start

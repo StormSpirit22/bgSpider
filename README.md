@@ -11,7 +11,7 @@ The simple steps to get & run bgSpider are:
 git clone https://github.com/StormSpirit22/bgSpider
 cd bgSpider
 npm i
-npm run questin
+npm run question
 npm run article
 ```
 

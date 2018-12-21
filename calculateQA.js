@@ -36,6 +36,7 @@ let postsForums = new Map();
 let postsTitles = new Map();
 let users = [];
 let validPosts = [];
+let usersDetails = new Map();
 let usersAddress = new Map();
 
 
@@ -59,18 +60,17 @@ class QuestionSpider {
         process.setMaxListeners(0);
         // 初始化
         this.init()
-        
     }
+
     // 初始化函数
     async init () {
-        
         fs.removeSync('./data');
         fs.ensureDirSync(path);
         console.log('正在启动浏览器...')
         this.browser = await puppeteer.launch();
         console.log('正在打开新页面...')
         this.page = await this.browser.newPage();
-        // 顺序爬取页面
+        // 爬取网页标题
         await this.getBatchForum();
         await this.getBatchJson();
         await this.getResult();
@@ -90,7 +90,7 @@ class QuestionSpider {
     async getForum(url) {
         try{
             let page = this.page;
-            await page.goto(url);
+            await page.goto(url, {timeout: 1000000});
             page.waitFor(1000);
             // 获取信息
             try {
@@ -104,7 +104,7 @@ class QuestionSpider {
                     // console.log("index1index2", index1, index2)
                     forum = title.substr(index1 + 3, index2 - index1 - 3);
                     fs.appendFileSync('./data/forum.txt', url + "|" +forum + "\n");
-                    console.log("forum", forum);
+                    // console.log("forum", forum);
                     let filename = url.substr(url.length - 4, url.length);
                     if(forum === "ETH" || forum === "EOS" || forum === "BTC" || forum === "HPB" || forum === "DAG" || forum === "IPFS" || forum === "Other" || forum === "海阔天空") {
                         postsForums.set(filename, forum);
@@ -121,7 +121,7 @@ class QuestionSpider {
             console.log("=======getForum Error=======")
             console.log(error);
             console.log("============================")
-            this.closeBrowser();
+            // this.closeBrowser();
         }
     }
 
@@ -136,27 +136,19 @@ class QuestionSpider {
         let page = this.page
         try{
             console.log("url", url);
-            await page.goto(url + '.json');
+            await page.goto(url + '.json', {timeout: 1000000});
             // page.waitFor(1000);
             // 获取信息
             try {
                 // 获取文本
-                // console.log("page", page)
-                // var content = await page.content(); 
-                // console.log("content", content)
-                
                 let innerText = await page.evaluate(() =>  {
                     console.log('document.querySelector("body").innerText', document.querySelector("body").innerText);
                     return JSON.parse(document.querySelector("body").innerText); 
                 }); 
-                // console.log("innerText", innerText.post_stream.posts)
                 fs.writeFileSync('./data/posts/' + url.substr(url.length - 4, url.length) + '.txt', JSON.stringify(innerText.post_stream.posts))
-                // console.log("success");
                 return "success";
-                // console.log(innerText);
 
             } catch (error) {
-                // console.log("error", error);
                 return "error"
             }
         } catch(error) {
@@ -174,16 +166,9 @@ class QuestionSpider {
             let stats=fs.statSync(fPath);
             if(stats.isFile()) {
                 let posts = fs.readJsonSync(fPath);
-                // console.log(posts);
                 let result = await this.calculatePosts(posts,filename);
                 console.log("result",result)
                 if(result === "ExceedDate") {
-                    // for (var [key, value] of usersPosts) {
-                    //     console.log("value", value);
-                    //     // for(let v of value.posts) {
-                    //     //     console.log("post", v)
-                    //     // }
-                    // }
                     return;
                 }
             }
@@ -191,15 +176,14 @@ class QuestionSpider {
     }
     
     calculatePosts(posts, filename) {
-        // console.log("postsForums",postsForums)
         filename = filename.substr(0, 4);
         console.log("filename", filename)
         return new Promise(function(resolve, reject) {
             let i = 0;
             let usersInPost = new Set();
             let postType = "";
+            let postForum = postsForums.get(filename);
             for(let value of posts){
-                // console.log("value.name", value.name)
                 let post = {};
                 let author = {};
     
@@ -209,31 +193,23 @@ class QuestionSpider {
                 author.articles = 0;                          //初始化文章数
                 author.replys = 0;                            //初始化回复数
                 author.posts = [];                            //初始化帖子详情
+                author.hQuestions = 0;                        //海阔天空版块
+                author.hReplys = 0;
                 post.created_at = value.created_at;         //创建时间
                 post.forum = postsForums.get(filename);
                 post.title = postsTitles.get(filename);
-                // console.log("post")
                 if(i == 0) {
                     // post.cooked = posts[i].cooked;                 //帖子内容
                     post.link = url + filename;
-                    // post.title = title;
-                    
                     let createDate = new Date(post.created_at);
-                    console.log("author createDate", createDate);
+                    console.log("author createDate", createDate.toLocaleString());
     
-                    //判断主题帖字数是否大于500
+                    //判断主题帖字符数是否大于800
                     let str = value.cooked.toString();
-                    let countChinese = 0;
-                    for(let j = 0; j < str.length; j++) {
-                        let ch = str.charCodeAt(j);
-                        if(ch > 255)countChinese++;
-                    }
-                    console.log("countChinese", countChinese);
-                    if(countChinese >= 500) {
+                    if(str.length >= 800) {
                         post.type = type.ARTICLE;
                         postType = type.ARTICLE;
-                    }
-                    else {
+                    } else {
                         post.type = type.QUESTION;
                         postType = type.QUESTION;
                     }
@@ -242,25 +218,20 @@ class QuestionSpider {
                         resolve("ExceedDate");
                     }
                     if(createDate >= startDate) {
-                        // console.log("length", author.cooked.toString().length);
-                        // console.log("author.name", author.name)
                         if(!usersPosts.has(author.name)) {
-                            if(post.type === type.ARTICLE) {
-                                author.articles = 1;
+                            if(postForum === '海阔天空') {
+                                author.hQuestions = 1
                             }
-                            else author.questions = 1;
-                            author.posts.push(post);
+                            author.questions = 1;
                         }
                         else {
                             author = usersPosts.get(author.name);
-                            if(post.type === type.ARTICLE) {
-                                author.articles += 1;
+                            if(postForum === '海阔天空') {
+                                author.hQuestions += 1
                             }
-                            else {
-                                author.questions += 1;
-                            }
-                            author.posts.push(post);
+                            author.questions += 1;
                         }
+                        author.posts.push(post);
                         usersPosts.set(author.name, author);
                         usersInPost.add(author.name)
                         if(!users.includes(author.username)) {
@@ -271,7 +242,7 @@ class QuestionSpider {
                 else if(postType === type.QUESTION){
                     console.log("question", posts[i].name)
                     let createDate = new Date(post.created_at);
-                    console.log("reply createDate", createDate);
+                    console.log("reply createDate", createDate.toLocaleString());
                     if(createDate >= startDate && createDate <= endDate) {
                          //如果该帖子回复用户中没有该用户才计入统计，比如一个用户回复两次也只计算一次奖励，自问自答没有奖励
                         if(!usersInPost.has(value.name)) {
@@ -279,15 +250,19 @@ class QuestionSpider {
                             let index = i + 1;
                             post.link = url + filename + "/" + index.toString();               
                             post.type = type.REPLY;
-                            // post.title = title;
     
                             if(!usersPosts.has(author.name)) {
+                                if(postForum === '海阔天空') {
+                                    author.hReplys = 1
+                                }
                                 author.replys = 1;
                             }
                             else {
                                 author = usersPosts.get(author.name);
-                                if(author.replys != undefined)author.replys += 1;
-                                else author.replys = 1;
+                                if(postForum === '海阔天空') {
+                                    author.hReplys += 1
+                                }
+                                author.replys += 1;
                             }
                             author.posts.push(post);
                             usersPosts.set(author.name, author);
@@ -295,11 +270,9 @@ class QuestionSpider {
                             if(!users.includes(author.username)) {
                                 users.push(author.username);
                             }
-                            // console.log("==========usersPosts", JSON.stringify(usersPosts.get(author.name)))
                         }
                     }
                 }
-                // fs.writeFileSync("./usersPosts.txt", JSON.stringify(usersPosts))
                 i ++;
             }
             resolve("success")
@@ -314,98 +287,53 @@ class QuestionSpider {
     }
     
     async getUsersAddress(username) {
-        console.log("getUsersAddress");
-        // console.log(users);
         return new Promise((resolve, reject) => {
             request("http://blockgeek.org/u/" + username + ".json", function(error, response, body) {
-                // console.log('ERROR:', error); // Print the error if one occurred
-                // console.log('statusCode:', response && response.statusCode); // Print the response status code if a response was received
-                // console.log('body:', JSON.parse(body)); // Print the HTML for the Google homepage.
                 if(!error && response.statusCode == 200) {
                     let result = JSON.parse(body);
-                    // console.log("result", result)
                     let userFields = objToStrMap(result.user.user_fields);
-                    console.log("userFields", userFields);
-                    // objToStrMap(userFields));
-                    let address = userFields.get("1");
-                    if(address === null)address = "";
+                    let userTitle = result.user.title === null ? "" : result.user.title;
+                    let address = userFields.get("1") === null ? "": userFields.get("1");
                     usersAddress.set(username, address);
-                    // console.log("usersAddress", usersAddress);
+                    let details = {};
+                    details.address = address;
+                    details.rank = userTitle;
+                    usersDetails.set(username, details);
                     resolve("Success")
                 }
                 resolve("Error")
             })
         })
-        // console.log("getUsersAddress");
-        // console.log(users);
-        // let page = this.page
-        // try{
-        //     await page.goto("http://blockgeek.org/u/" + username + ".json");
-        //     // page.waitFor(1000);
-        //     // 获取信息
-        //     try {
-        //         // 获取文本
-        //         // console.log("page", page)
-        //         // var content = await page.content(); 
-        //         // console.log("content", content)
-                
-        //         let innerText = await page.evaluate(() =>  {
-        //             console.log('document.querySelector("body").innerText', document.querySelector("body").innerText);
-        //             return JSON.parse(document.querySelector("body").innerText); 
-        //         }); 
-        //         let result = innerText;
-        //         // console.log("result", result)
-        //         let userFields = this.objToStrMap(result.user.user_fields);
-        //         console.log("userFields", userFields);
-        //         // objToStrMap(userFields));
-        //         usersAddress.set(username, userFields.get("1"));
-        //         console.log("usersAddress", usersAddress);
-        //         // console.log("success");
-        //         return "success";
-        //         // console.log(innerText);
-
-        //     } catch (error) {
-        //         // console.log("error", error);
-        //         return "error"
-        //     }
-        // } catch(error) {
-        //     console.log("======getJson Error========")
-        //     console.log(error);
-        //     console.log("===========================")
-        //     // this.closeBrowser();
-        // }
     }
 
     async writeFile() {
 
-        console.log("=====usersAddress=====", usersAddress)
-        let _headers = ['name', 'username', 'questions', 'replys', 'rewards', 'address'];
-        let _headers2 = ['name', 'username', 'link', 'title', 'forum'];
+        console.log("=====usersDetails=====", usersDetails)
+        let _headers = ['name', 'username', 'questions', 'replys', 'rewards', 'address', 'rank'];
+        let _headers2 = ['name', 'username', 'link', 'title', 'created_at', 'forum'];
         let _data = [];
         let _posts = [];
         for (var [key, value] of usersPosts) {
-            // console.log("value", value);
             let user = {};
             user.name = value.name;
             user.username = value.username;
             user.questions = value.questions;
             user.replys = value.replys;
-            user.rewards = parseInt(user.questions) * 1 + parseInt(user.replys) * 5;
-            user.address = usersAddress.get(user.username);
+            user.rewards = (parseFloat(value.questions) * 1 + parseFloat(value.replys) * 5) - (parseFloat(value.hQuestions) * 0.4 + parseFloat(value.hReplys) * 2);
+            user.address = usersDetails.get(value.username).address;
+            user.rank = usersDetails.get(value.username).rank;
             _data.push(user)
-            // console.log("value.posts", value.posts)
             for(let p of value.posts) {
                 let post = {}
                 post.name = value.name;
                 post.username = value.username;
                 post.link = p.link;
                 post.title = p.title;
+                post.created_at = new Date(p.created_at.toString()).toLocaleString();
                 post.forum = p.forum;
                 _posts.push(post)
             }
         }
-        // console.log("_data", _data)
-        // console.log("_posts", _posts)
         if(_data.length !== 0) {
             var headers = _headers
             .map((v, i) => Object.assign({}, {v: v, position: String.fromCharCode(65+i) + 1 }))
@@ -457,39 +385,6 @@ class QuestionSpider {
         }
     }
     
-    // 抓取页面内容
-    async getPageInfo (actPage) {
-        // 延时 1000 毫秒
-        // await timeout(1000);
-        let page = this.page
-        try{
-            await page.goto(`http://blockgeek.org/t/topic/${actPage}.json`);
-            // 获取信息
-            try {
-                // 获取文本
-                // console.log("page", page)
-                var content = await page.content(); 
-                // console.log("content", content)
-                
-                let innerText = await page.evaluate(() =>  {
-                    console.log('document.querySelector("body").innerText', document.querySelector("body").innerText);
-                    return JSON.parse(document.querySelector("body").innerText); 
-                }); 
-                // console.log("innerText", innerText)
-                fs.writeFileSync('./test/' + actPage + '.txt', JSON.stringify(innerText))
-                console.log("success");
-                // console.log(innerText);
-
-            } catch (error) {
-                console.log("error");
-            }
-        } catch(error) {
-            console.log("==============")
-            console.log(error);
-            console.log("==============")
-        }
-    
-    }
   // 关闭浏览器
     async closeBrowser () {
         console.log('正在关闭浏览器...')
@@ -516,6 +411,4 @@ function objToStrMap(obj) {
 }
 
 // 启用爬虫
-// new OnePaChong()
-// getBatchForum()
 new QuestionSpider()

@@ -6,3 +6,6 @@ back.js
 *.txt
 .DS_Store/
 .vscode/
+main.js
+count*
+test.json

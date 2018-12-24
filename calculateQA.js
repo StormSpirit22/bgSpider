@@ -98,13 +98,13 @@ class QuestionSpider {
                 let title = await page.title();
                 let forum = "";
                 console.log("title", title)
-                // if(title.includes('【提问】')) {
+                if(title.includes('【提问】')) {
                     let index1 = title.indexOf(" - ");
                     let index2 = title.indexOf(" - ", index1 + 1);
                     // console.log("index1index2", index1, index2)
                     forum = title.substr(index1 + 3, index2 - index1 - 3);
                     fs.appendFileSync('./data/forum.txt', url + "|" +forum + "\n");
-                    // console.log("forum", forum);
+                    console.log("forum", forum);
                     let filename = url.substr(url.length - 4, url.length);
                     if(forum === "ETH" || forum === "EOS" || forum === "BTC" || forum === "HPB" || forum === "DAG" || forum === "IPFS" || forum === "Other" || forum === "海阔天空") {
                         postsForums.set(filename, forum);
@@ -112,7 +112,7 @@ class QuestionSpider {
                         validPosts.push("http://blockgeek.org/t/topic/" + filename);
                     }
                     return forum;
-                // }
+                }
     
             } catch (error) {
                 console.log("error", error);
@@ -181,7 +181,6 @@ class QuestionSpider {
         return new Promise(function(resolve, reject) {
             let i = 0;
             let usersInPost = new Set();
-            let postType = "";
             let postForum = postsForums.get(filename);
             for(let value of posts){
                 let post = {};
@@ -205,14 +204,14 @@ class QuestionSpider {
                     console.log("author createDate", createDate.toLocaleString());
     
                     //判断主题帖字符数是否大于800
-                    let str = value.cooked.toString();
-                    if(str.length >= 800) {
-                        post.type = type.ARTICLE;
-                        postType = type.ARTICLE;
-                    } else {
-                        post.type = type.QUESTION;
-                        postType = type.QUESTION;
-                    }
+                    // let str = value.cooked.toString();
+                    // if(str.length >= 800) {
+                    //     post.type = type.ARTICLE;
+                    //     postType = type.ARTICLE;
+                    // } else {
+                    //     post.type = type.QUESTION;
+                    //     postType = type.QUESTION;
+                    // }
     
                     if(createDate > endDate) {
                         resolve("ExceedDate");
@@ -239,7 +238,7 @@ class QuestionSpider {
                         }
                     }
                 }
-                else if(postType === type.QUESTION){
+                else {
                     console.log("question", posts[i].name)
                     let createDate = new Date(post.created_at);
                     console.log("reply createDate", createDate.toLocaleString());

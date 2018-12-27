@@ -100,7 +100,7 @@ class ArticleSpider {
                 let title = await page.title();
                 let forum = "";
                 console.log("title", title)
-                if(title.includes('【原创】') || title.includes('【转载】')) {
+                if(title.includes('【原创】') || title.includes('【转载】') || title.includes('【翻译】')) {
                     let index1 = title.indexOf(" - ");
                     let index2 = title.indexOf(" - ", index1 + 1);
                     // console.log("index1index2", index1, index2)
